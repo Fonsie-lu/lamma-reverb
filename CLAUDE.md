@@ -1,4 +1,8 @@
-# Lemma: project notes for Claude
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Lemma: project notes
 
 A reverb effect plugin for **Bitwig Studio on Linux**. It has four sections: an amp that adds
 harmonics, a reverb with a tempo-synced ping-pong delay, a key-tracking harmonic EQ and a low /
@@ -9,11 +13,13 @@ that project's CLAUDE.md for the background of the shared patterns.
 
 The stack and the build machine are the same as juno-clone: Rust, nih-plug (git, rev pinned in
 `Cargo.lock`) and `nih_plug_egui` (egui 0.31). The plugin is exported as CLAP and VST3, and the
-user should use the CLAP version in Bitwig.
+user should use the CLAP version in Bitwig (VST3 editors render black there).
 
 ```sh
 ./install.sh                                   # bundles, symlinked into ~/.clap and ~/.vst3
+                                               # (--no-build, --clap/--vst3, TARGET_CPU=x86-64-v3)
 cargo test --release --lib                     # DSP unit tests + headless GUI tests
+cargo test --release --lib editor::tests::controls_do_not_overlap   # a single test (name filter)
 cargo run --release --example render -- <dir>  # every preset to WAV; peak, RMS, tail, NaN, key, CPU
 cargo run --release --example gui_preview      # GUI without host; LEMMA_DEMO=1, LEMMA_THEME=0..3
 ```
@@ -21,6 +27,10 @@ cargo run --release --example gui_preview      # GUI without host; LEMMA_DEMO=1,
 For screenshots, use the same workflow as juno-clone, with the window title
 "Lemma Preview". To check the WAV output, run
 `ffmpeg -i x.wav -lavfi showspectrumpic=s=900x380:scale=log out.png` and then Read the PNG.
+
+`install.sh` builds through `cargo xtask bundle lemma --release` (alias in `.cargo/config.toml`).
+nih-plug is built with `assert_process_allocs`: an allocation on the audio thread panics in
+debug builds, so `process()` and everything in the engine must not allocate or lock.
 
 ## Layout
 
@@ -35,10 +45,16 @@ For screenshots, use the same workflow as juno-clone, with the window title
 | `src/harmonic.rs` | `KeyDetector` (Krumhansl-Kessler, decaying histogram, hysteresis) and `HarmonicEq` (bell or bandpass bank, up to 32 bands, f64 SVFs) |
 | `src/filter.rs` | Butterworth HP + LP, 12 / 24 dB, resonance on the last stage |
 | `src/dsp.rs` | `Svf`/`SvfCoefs` (Simper, f64, exact `response()`), `DelayLine`, `Oversampler` (129-tap polyphase, latency `OS_LATENCY` = 32), `dot`, `tanh` |
-| `src/editor.rs` + `src/editor_tests.rs` | GUI and headless tests (harness copied from juno-clone) |
+| `src/visuals.rs` | `VisualState`: lock-free atomics + triple-buffered scope, audio thread -> editor |
+| `src/editor.rs` + `src/editor_tests.rs` | GUI and headless tests (harness copied from juno-clone; tests live in module `editor::tests`) |
 | `src/theme.rs` | The same 4 themes as juno-clone, with `Section` = Amp, Reverb, PingPong, Harmonic, Filter, Output |
 | `src/presets.rs` | Factory presets as `(param_id, plain value)` |
 | `examples/render.rs` | Its `set()` maps preset IDs to `Settings` fields by hand; update it when adding params |
+
+Adding a parameter touches: `params.rs` (the param), the section's `*Settings` struct,
+`settings_from_params()` in `lib.rs`, `set()` in `examples/render.rs`, presets if needed, and the
+editor. `editor::tests::every_control_is_registered` asserts exact counts per control kind, so
+bump those counts when you add a control.
 
 ## Decisions
 
