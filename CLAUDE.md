@@ -87,7 +87,12 @@ bump those counts when you add a control.
 - Measured CPU, single instance, 48 kHz, on the Ryzen 3500U: about 2-4 % of a core with
   everything on. The amp's oversampling costs the most.
 - Not yet checked in Bitwig itself: GUI, state save / restore, and how notes reach the plugin.
-  clap-validator has not been run.
+- clap-validator 0.4.1 (install into the scratchpad with
+  `cargo install --git https://github.com/free-audio/clap-validator --root <dir>`), release
+  bundle: **33 passed, 4 failed, 7 skipped**. The failures are `state-reproducibility-{basic,binary,buffered}`
+  and `state-invalid-random` (huge allocation), the same nih-plug failures as juno-clone and
+  eq-graph. A debug bundle also crashes `process-varying-block-sizes` with an allocation inside
+  nih-plug's `VecDeque<NoteEvent>` (`handle_in_event`); no Lemma code is on that stack.
 - Ideas:
   - The key detector's memory as a parameter.
   - Per-harmonic gain tilt.
